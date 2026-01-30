@@ -152,78 +152,49 @@ st.markdown("""
         margin-top: 2rem;
     }
     
-    /* Card styling */
-    .insight-card {
-        background-color: #243447;
-        border: 1px solid #2a3f57;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        height: 100%;
+    /* Write-up container styling */
+    .writeup-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 0;
     }
     
-    .card-ai {
-        border-left: 3px solid #00d9c0;
-        background: linear-gradient(135deg, #243447 0%, #1e3a4a 100%);
-    }
-    
-    .card-strength {
-        border-left: 3px solid #10b981;
-        background: linear-gradient(135deg, #243447 0%, #1e3f33 100%);
-    }
-    
-    .card-weakness {
-        border-left: 3px solid #f59e0b;
-        background: linear-gradient(135deg, #243447 0%, #3f3220 100%);
-    }
-    
-    .card-header {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1rem;
-        font-size: 1.1rem;
-        font-weight: 600;
-    }
-    
-    .card-header-ai {
-        color: #00d9c0;
-    }
-    
-    .card-header-strength {
-        color: #10b981;
-    }
-    
-    .card-header-weakness {
-        color: #f59e0b;
-    }
-    
-    .card-icon {
-        margin-right: 0.5rem;
-        font-size: 1.2rem;
-    }
-    
-    .card-content {
-        color: #d1d5db;
-        font-size: 0.9rem;
-        line-height: 1.6;
-        margin-bottom: 1rem;
-    }
-    
-    .card-bullet {
+    .batter-header {
+        font-size: 2.5rem;
+        font-weight: 700;
         margin-bottom: 0.5rem;
-        padding-left: 1rem;
+        color: #60a5fa;
     }
     
-    .card-button {
-        background-color: rgba(0, 217, 192, 0.1);
-        border: 1px solid #00d9c0;
-        color: #00d9c0;
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        font-size: 0.85rem;
+    .batter-hand {
+        font-size: 1.2rem;
+        color: #9ca3af;
+        margin-bottom: 2rem;
         font-weight: 500;
-        cursor: pointer;
-        margin-top: 1rem;
+    }
+    
+    .insight {
+        margin-bottom: 1.5rem;
+        padding: 1.5rem;
+        background-color: #243447;
+        border-radius: 8px;
+        border-left: 4px solid #00d9c0;
+        color: #e0e0e0;
+        line-height: 1.8;
+    }
+    
+    .insight p {
+        margin: 0;
+        line-height: 1.8;
+    }
+    
+    .stats-footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 2px solid #2a3444;
+        font-size: 0.9rem;
+        color: #9ca3af;
+        font-style: italic;
     }
     
     /* Hide Streamlit branding */
@@ -233,20 +204,31 @@ st.markdown("""
     
     /* Tabs styling */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #1a2332;
+        gap: 24px;
+        background-color: transparent;
+        border-bottom: 1px solid #2a3444;
+        padding-bottom: 0;
     }
     
     .stTabs [data-baseweb="tab"] {
-        background-color: #2a3444;
-        border-radius: 8px;
-        color: #9ca3af;
-        padding: 0.5rem 1rem;
+        background-color: transparent;
+        border-radius: 0;
+        color: #d1d5db;
+        padding: 1rem 0.5rem;
+        font-size: 0.95rem;
+        font-weight: 500;
+        border-bottom: 3px solid transparent;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #ffffff;
+        background-color: transparent;
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: #00d9c0;
-        color: #0f1722;
+        background-color: transparent;
+        color: #ef4444;
+        border-bottom: 3px solid #ef4444;
     }
     
     /* Multiselect styling */
@@ -281,72 +263,28 @@ def get_team_players_list(merged_df: pd.DataFrame, team_name: str) -> List[str]:
 
 
 def display_writeup(writeup_dict: dict):
-    """Display a formatted write-up in card layout."""
-    # Create three columns for the card layout
-    col1, col2, col3 = st.columns(3)
+    """Display a formatted write-up."""
+    st.markdown(f"""
+    <div class="writeup-container">
+        <div class="batter-header">{writeup_dict['batter_name']}</div>
+        <div class="batter-hand">{writeup_dict['batting_hand']}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    insights = writeup_dict['insights']
-    
-    # AI Insights Card (combines length and line insights)
-    with col1:
-        ai_insights = []
-        for insight in insights[:2]:  # Length and Line insights
-            ai_insights.append(insight)
-        
+    # Display insights
+    for i, insight in enumerate(writeup_dict['insights'], 1):
         st.markdown(f"""
-        <div class="insight-card card-ai">
-            <div class="card-header card-header-ai">
-                <span class="card-icon">🎯</span> AI Insights
-            </div>
-            <div class="card-content">
-                <div class="card-bullet">• {writeup_dict['batter_name']} - {writeup_dict['batting_hand']}</div>
-                {"".join([f'<div class="card-bullet">• {insight.replace("**", "").replace(":", ":")}</div>' for insight in ai_insights])}
-            </div>
-            <button class="card-button">+ Add Insight</button>
+        <div class="insight">
+            {insight}
         </div>
         """, unsafe_allow_html=True)
     
-    # Strengths Card
-    with col2:
-        strength_insights = []
-        # Extract strength-related content
-        for insight in insights:
-            if 'Strong' in insight or 'Excels' in insight or 'Boundaries' in insight:
-                strength_insights.append(insight)
-        
-        st.markdown(f"""
-        <div class="insight-card card-strength">
-            <div class="card-header card-header-strength">
-                <span class="card-icon">📈</span> Strengths
-            </div>
-            <div class="card-content">
-                <div class="card-bullet">✓ Generate insights to see player strengths</div>
-                {"".join([f'<div class="card-bullet">✓ {insight.replace("**", "").replace(":", ":")}</div>' for insight in strength_insights[:2]])}
-            </div>
-            <button class="card-button">+ Add Strength</button>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Areas for Improvement Card
-    with col3:
-        weakness_insights = []
-        # Extract weakness-related content
-        for insight in insights:
-            if 'weak' in insight or 'struggles' in insight or 'Dismissals' in insight or 'Target' in insight:
-                weakness_insights.append(insight)
-        
-        st.markdown(f"""
-        <div class="insight-card card-weakness">
-            <div class="card-header card-header-weakness">
-                <span class="card-icon">⚠️</span> Areas for Improvement
-            </div>
-            <div class="card-content">
-                <div class="card-bullet">⚠ Generate insights to see areas for improvement</div>
-                {"".join([f'<div class="card-bullet">⚠ {insight.replace("**", "").replace(":", ":")}</div>' for insight in weakness_insights[:2]])}
-            </div>
-            <button class="card-button">+ Add Weakness</button>
-        </div>
-        """, unsafe_allow_html=True)
+    # Display stats footer
+    st.markdown(f"""
+    <div class="stats-footer">
+        {writeup_dict['num_insights']} insights | {writeup_dict['word_count']} words | {writeup_dict['line_count']} lines
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def main():
@@ -428,33 +366,35 @@ def main():
     st.markdown('<div class="main-header">Cricket Opposition Planning</div>', unsafe_allow_html=True)
     st.markdown('<div class="main-subtitle">Analyze player performance and opposition strategies</div>', unsafe_allow_html=True)
     
-    # Get data for selected player
-    player_data = merged_df[
-        (merged_df['team_bat'] == selected_team) & 
-        (merged_df['bat'] == selected_player)
-    ]
+    # Get all players for selected team
+    team_players = get_team_players_list(merged_df, selected_team)
+    selected_df = merged_df[merged_df['team_bat'] == selected_team].sort_values('team_runs_rank')
     
-    if player_data.empty:
-        st.warning("⚠️ No data available for the selected player.")
+    if selected_df.empty:
+        st.warning("⚠️ No data available for the selected team.")
         return
     
-    batter_data = player_data.iloc[0]
+    # Player tabs at the top
+    player_names = selected_df['bat'].tolist()
+    tabs = st.tabs(player_names)
     
-    # Player Analysis Header
-    st.markdown(f'<div class="player-analysis-header">Player Analysis: {selected_player}</div>', unsafe_allow_html=True)
-    
-    # Generate write-up
-    try:
-        writeup = writeup_generator.generate_writeup(batting_df, batter_data)
-        
-        # Check if we have sufficient insights
-        if writeup['num_insights'] < 3:
-            st.info(f"ℹ️ Limited data available for {batter_data['bat']}. Only {writeup['num_insights']} insight(s) generated.")
-        
-        display_writeup(writeup)
-        
-    except Exception as e:
-        st.error(f"Error generating write-up for {batter_data['bat']}: {str(e)}")
+    for tab_idx, (tab, player_row) in enumerate(zip(tabs, selected_df.iterrows())):
+        with tab:
+            batter_data = player_row[1]
+            
+            # Generate write-up
+            with st.spinner(f"Generating analysis for {batter_data['bat']}..."):
+                try:
+                    writeup = writeup_generator.generate_writeup(batting_df, batter_data)
+                    
+                    # Check if we have sufficient insights
+                    if writeup['num_insights'] < 3:
+                        st.warning(f"⚠️ Limited data available for {batter_data['bat']}. Only {writeup['num_insights']} insight(s) generated.")
+                    
+                    display_writeup(writeup)
+                    
+                except Exception as e:
+                    st.error(f"Error generating write-up for {batter_data['bat']}: {str(e)}")
 
 
 if __name__ == "__main__":
