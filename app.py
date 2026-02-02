@@ -183,12 +183,10 @@ st.markdown("""
     
     .insight {
         margin-bottom: 1.5rem;
-        padding: 1.5rem;
-        background-color: #243447;
-        border-radius: 8px;
-        border-left: 4px solid #00d9c0;
+        margin-left: 1.5rem;
         color: #e0e0e0;
         line-height: 1.8;
+        list-style-type: disc;
     }
     
     .insight p {
@@ -196,13 +194,24 @@ st.markdown("""
         line-height: 1.8;
     }
     
-    .stats-footer {
+    .additional-comments-label {
+        color: #00d9c0;
+        font-size: 1rem;
+        font-weight: 600;
         margin-top: 2rem;
-        padding-top: 1rem;
-        border-top: 2px solid #2a3444;
-        font-size: 0.9rem;
-        color: #9ca3af;
-        font-style: italic;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stTextArea > label {
+        color: #00d9c0 !important;
+        font-weight: 600;
+    }
+    
+    .stTextArea textarea {
+        background-color: #2a3444;
+        border: 1px solid #3a4556;
+        color: #e0e0e0;
+        border-radius: 8px;
     }
     
     /* Hide Streamlit branding */
@@ -341,6 +350,27 @@ def generate_pdf(batting_df: pd.DataFrame, selected_df: pd.DataFrame, team_name:
         textColor=HexColor('#1a2332'),
         spaceAfter=12,
         leading=16,
+        leftIndent=20,
+        bulletIndent=10,
+        bulletFontName='Helvetica'
+    )
+    
+    comments_label_style = ParagraphStyle(
+        'CommentsLabel',
+        parent=styles['Normal'],
+        fontSize=12,
+        textColor=HexColor('#00d9c0'),
+        spaceAfter=8,
+        fontName='Helvetica-Bold'
+    )
+    
+    comments_style = ParagraphStyle(
+        'Comments',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=HexColor('#1a2332'),
+        spaceAfter=12,
+        leading=16,
         leftIndent=10
     )
     
@@ -352,6 +382,7 @@ def generate_pdf(batting_df: pd.DataFrame, selected_df: pd.DataFrame, team_name:
     # Add each player's write-up
     for idx, (_, player_row) in enumerate(selected_df.iterrows()):
         batter_data = player_row
+        player_name = batter_data['bat']
         
         try:
             writeup = writeup_generator.generate_writeup(batting_df, batter_data)
@@ -360,16 +391,22 @@ def generate_pdf(batting_df: pd.DataFrame, selected_df: pd.DataFrame, team_name:
             elements.append(Paragraph(writeup['batter_name'], player_name_style))
             elements.append(Paragraph(writeup['batting_hand'], player_hand_style))
             
-            # Add insights
+            # Add insights as bullet points
             for insight in writeup['insights']:
-                # Clean up the insight text
-                clean_insight = insight.replace('**', '').replace('*', '')
-                elements.append(Paragraph(clean_insight, insight_style))
+                # Convert **text** to <b>text</b> for PDF
+                formatted_insight = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', insight)
+                # Convert *text* to <i>text</i>
+                formatted_insight = re.sub(r'\*(.*?)\*', r'<i>\1</i>', formatted_insight)
+                # Add bullet point
+                bullet_text = f"• {formatted_insight}"
+                elements.append(Paragraph(bullet_text, insight_style))
             
-            # Add stats footer
-            stats_text = f"<i>{writeup['num_insights']} insights | {writeup['word_count']} words</i>"
-            elements.append(Spacer(1, 0.1*inch))
-            elements.append(Paragraph(stats_text, player_hand_style))
+            # Add additional comments if they exist
+            comments_key = f"comments_{player_name}"
+            if comments_key in st.session_state and st.session_state[comments_key].strip():
+                elements.append(Spacer(1, 0.2*inch))
+                elements.append(Paragraph("Additional Comments:", comments_label_style))
+                elements.append(Paragraph(st.session_state[comments_key], comments_style))
             
             # Add page break between players (except for the last one)
             if idx < len(selected_df) - 1:
@@ -394,7 +431,18 @@ def get_team_players_list(merged_df: pd.DataFrame, team_name: str) -> List[str]:
     return team_players['bat'].tolist()
 
 
-def display_writeup(writeup_dict: dict):
+def format_insight_text(insight: str) -> str:
+    """Convert markdown-style formatting to HTML."""
+    # Convert **text** to <strong>text</strong>
+    import re
+    # Replace **text** with <strong>text</strong>
+    insight = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', insight)
+    # Replace *text* with <em>text</em> (for any remaining single asterisks)
+    insight = re.sub(r'\*(.*?)\*', r'<em>\1</em>', insight)
+    return insight
+
+
+def display_writeup(writeup_dict: dict, player_name: str):
     """Display a formatted write-up."""
     st.markdown(f"""
     <div class="writeup-container">
@@ -403,20 +451,32 @@ def display_writeup(writeup_dict: dict):
     </div>
     """, unsafe_allow_html=True)
     
-    # Display insights
+    # Display insights as bullet points
+    st.markdown('<ul style="color: #e0e0e0; line-height: 2;">', unsafe_allow_html=True)
     for i, insight in enumerate(writeup_dict['insights'], 1):
+        formatted_insight = format_insight_text(insight)
         st.markdown(f"""
-        <div class="insight">
-            {insight}
-        </div>
+        <li style="margin-bottom: 1.5rem; font-size: 0.95rem;">
+            {formatted_insight}
+        </li>
         """, unsafe_allow_html=True)
+    st.markdown('</ul>', unsafe_allow_html=True)
     
-    # Display stats footer
-    st.markdown(f"""
-    <div class="stats-footer">
-        {writeup_dict['num_insights']} insights | {writeup_dict['word_count']} words | {writeup_dict['line_count']} lines
-    </div>
-    """, unsafe_allow_html=True)
+    # Add Additional Comments text area
+    st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
+    additional_comments = st.text_area(
+        "Additional Comments",
+        key=f"comments_{player_name}",
+        height=100,
+        placeholder="Enter any additional tactical notes or observations..."
+    )
+    
+    # Store comments in session state
+    if f"comments_{player_name}" not in st.session_state:
+        st.session_state[f"comments_{player_name}"] = ""
+    st.session_state[f"comments_{player_name}"] = additional_comments
+    
+    return additional_comments
 
 
 def main():
@@ -438,17 +498,6 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Navigation
-        st.markdown("""
-        <div class="nav-section">
-            <div class="nav-item">🏠 Home</div>
-            <div class="nav-item">🏏 Cricket</div>
-            <div class="nav-item">🏀 NBA</div>
-            <div class="nav-item">⚽ EPL</div>
-            <div class="nav-item">🏈 AFL</div>
-            <div class="nav-item">🏉 NRL</div>
-        </div>
-        """, unsafe_allow_html=True)
         
         # Team Selection section
         st.markdown('<div class="team-selection-header">Team Selection</div>', unsafe_allow_html=True)
@@ -533,7 +582,7 @@ def main():
                     if writeup['num_insights'] < 3:
                         st.warning(f"⚠️ Limited data available for {batter_data['bat']}. Only {writeup['num_insights']} insight(s) generated.")
                     
-                    display_writeup(writeup)
+                    display_writeup(writeup, batter_data['bat'])
                     
                 except Exception as e:
                     st.error(f"Error generating write-up for {batter_data['bat']}: {str(e)}")
