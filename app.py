@@ -464,19 +464,19 @@ def display_writeup(writeup_dict: dict, player_name: str):
     
     # Add Additional Comments text area
     st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
-    additional_comments = st.text_area(
+    
+    # Initialize the value in session state if it doesn't exist (before widget creation)
+    comments_key = f"comments_{player_name}"
+    if comments_key not in st.session_state:
+        st.session_state[comments_key] = ""
+    
+    # Create the text area widget (it will automatically use and update session_state)
+    st.text_area(
         "Additional Comments",
-        key=f"comments_{player_name}",
+        key=comments_key,
         height=100,
         placeholder="Enter any additional tactical notes or observations..."
     )
-    
-    # Store comments in session state
-    if f"comments_{player_name}" not in st.session_state:
-        st.session_state[f"comments_{player_name}"] = ""
-    st.session_state[f"comments_{player_name}"] = additional_comments
-    
-    return additional_comments
 
 
 def main():
