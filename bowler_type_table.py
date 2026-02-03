@@ -97,7 +97,7 @@ def generate_bowler_type_table(bowler_data_df: pd.DataFrame, batter_name: str) -
 
 def display_bowler_type_table_html(df: pd.DataFrame):
     """
-    Display the bowler type table with color coding using HTML/CSS.
+    Display the bowler type table with color coding using Streamlit's dataframe styling.
     
     Args:
         df: DataFrame with performance metrics
@@ -106,120 +106,48 @@ def display_bowler_type_table_html(df: pd.DataFrame):
         st.warning("⚠️ No bowling type data available for this player.")
         return
     
-    # Build HTML table
-    html = """
-    <style>
-        .performance-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 2rem 0;
-            font-family: 'Inter', sans-serif;
-            background-color: #1a2332;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-        
-        .performance-table thead {
-            background-color: #0f1722;
-        }
-        
-        .performance-table th {
-            padding: 1rem;
-            text-align: left;
-            font-weight: 600;
-            color: #60a5fa;
-            font-size: 0.95rem;
-            border-bottom: 2px solid #2a3444;
-        }
-        
-        .performance-table tbody tr {
-            border-bottom: 1px solid #2a3444;
-        }
-        
-        .performance-table tbody tr:last-child {
-            border-bottom: none;
-        }
-        
-        .performance-table tbody tr:hover {
-            background-color: #243447;
-        }
-        
-        .performance-table td {
-            padding: 1rem;
-            color: #e0e0e0;
-            font-size: 0.9rem;
-        }
-        
-        .performance-table td:first-child {
-            font-weight: 500;
-            color: #ffffff;
-        }
-        
-        .metric-cell {
-            font-weight: 600;
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            display: inline-block;
-            min-width: 60px;
-            text-align: center;
-        }
-        
-        .table-title {
-            color: #00d9c0;
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            margin-top: 2rem;
-        }
-    </style>
+    # Display title
+    st.markdown('<h2 style="color: #00d9c0; margin-top: 2rem;">Performance vs Bowling Types</h2>', unsafe_allow_html=True)
     
-    <div class="table-title">Performance vs Bowling Types</div>
-    <table class="performance-table">
-        <thead>
-            <tr>
-                <th>Bowler Type</th>
-                <th>Balls Faced</th>
-                <th>Strike Rate</th>
-                <th>Average</th>
-                <th>Dot Ball %</th>
-                <th>Boundary %</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
+    # Create a copy for styling
+    display_df = df.copy()
     
-    # Add rows
-    for _, row in df.iterrows():
+    # Function to apply background color to cells
+    def apply_color_gradient(row):
         # Get colors for each metric
         sr_color = get_color_for_metric(row['Strike Rate'], 'strike_rate')
         avg_color = get_color_for_metric(row['Average'], 'average')
         dot_color = get_color_for_metric(row['Dot Ball %'], 'dot_pct')
         boundary_color = get_color_for_metric(row['Boundary %'], 'boundary_pct')
         
-        # Format values
-        strike_rate = f"{row['Strike Rate']:.1f}" if pd.notna(row['Strike Rate']) else "-"
-        average = f"{row['Average']:.1f}" if pd.notna(row['Average']) else "-"
-        dot_pct = f"{row['Dot Ball %']:.1f}%" if pd.notna(row['Dot Ball %']) else "-"
-        boundary_pct = f"{row['Boundary %']:.1f}%" if pd.notna(row['Boundary %']) else "-"
-        
-        html += f"""
-            <tr>
-                <td>{row['Bowler Type']}</td>
-                <td>{int(row['Balls Faced'])}</td>
-                <td><span class="metric-cell" style="background-color: {sr_color};">{strike_rate}</span></td>
-                <td><span class="metric-cell" style="background-color: {avg_color};">{average}</span></td>
-                <td><span class="metric-cell" style="background-color: {dot_color};">{dot_pct}</span></td>
-                <td><span class="metric-cell" style="background-color: {boundary_color};">{boundary_pct}</span></td>
-            </tr>
-        """
+        return [
+            '',  # Bowler Type
+            '',  # Balls Faced
+            f'background-color: {sr_color}; color: #1a2332; font-weight: bold',  # Strike Rate
+            f'background-color: {avg_color}; color: #1a2332; font-weight: bold',  # Average
+            f'background-color: {dot_color}; color: #1a2332; font-weight: bold',  # Dot Ball %
+            f'background-color: {boundary_color}; color: #1a2332; font-weight: bold'  # Boundary %
+        ]
     
-    html += """
-        </tbody>
-    </table>
-    """
+    # Apply the styling
+    styled = display_df.style.apply(apply_color_gradient, axis=1)
     
-    st.markdown(html, unsafe_allow_html=True)
+    # Format numeric columns
+    styled = styled.format({
+        'Balls Faced': '{:.0f}',
+        'Strike Rate': lambda x: f'{x:.1f}' if pd.notna(x) else '-',
+        'Average': lambda x: f'{x:.1f}' if pd.notna(x) else '-',
+        'Dot Ball %': lambda x: f'{x:.1f}%' if pd.notna(x) else '-',
+        'Boundary %': lambda x: f'{x:.1f}%' if pd.notna(x) else '-'
+    })
+    
+    # Display the table
+    st.dataframe(
+        styled,
+        use_container_width=True,
+        hide_index=True,
+        height=min(400, (len(df) + 1) * 35 + 10)
+    )
 
 
 def display_zone_analysis(zone_df: pd.DataFrame, batter_name: str):
