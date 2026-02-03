@@ -9,8 +9,9 @@ from typing import Dict, List, Tuple
 
 
 # Length columns in the dataset
+# Note: 'full_toss' is excluded from analysis as per requirements
 LENGTH_COLS = [
-    'full', 'good_length', 'short', 'short_of_a_good_length', 'yorker', 'full_toss'
+    'full', 'good_length', 'short', 'short_of_a_good_length', 'yorker'
 ]
 
 # Line columns in the dataset

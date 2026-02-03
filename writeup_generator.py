@@ -20,6 +20,76 @@ def format_metric_subsequent(avg: float, sr: float) -> str:
     return f"({avg:.0f}; {sr:.0f})"
 
 
+def evaluate_performance(avg: float, sr: float, is_strength: bool) -> str:
+    """
+    Evaluate performance and return appropriate cricket adjective.
+    
+    Args:
+        avg: Average (runs per dismissal)
+        sr: Strike rate
+        is_strength: Whether this is meant to be a strength or weakness
+        
+    Returns:
+        Appropriate adjective for the performance
+    """
+    # Strike Rate Classification
+    sr_excellent = sr >= 160
+    sr_very_good = 140 <= sr < 160
+    sr_good = 120 <= sr < 140
+    sr_average = 100 <= sr < 120
+    sr_below_avg = 80 <= sr < 100
+    sr_poor = sr < 80
+    
+    # Average Classification
+    avg_excellent = avg >= 50
+    avg_very_good = 35 <= avg < 50
+    avg_good = 25 <= avg < 35
+    avg_average = 18 <= avg < 25
+    avg_below_avg = 12 <= avg < 18
+    avg_poor = avg < 12
+    
+    # For strengths, both metrics should be at least good
+    if is_strength:
+        if (sr_excellent or sr_very_good) and (avg_excellent or avg_very_good):
+            return "strong"
+        elif sr_very_good and avg_good:
+            return "solid"
+        elif sr_good and avg_very_good:
+            return "solid"
+        elif sr_good and avg_good:
+            return "decent"
+        else:
+            # If metrics don't support "strength" labeling, return neutral
+            return "performs"
+    
+    # For weaknesses, at least one metric should be genuinely weak
+    else:
+        if sr_poor or avg_poor:
+            return "weak"
+        elif (sr_poor or sr_below_avg) and (avg_poor or avg_below_avg):
+            return "weak"
+        elif sr_below_avg and avg_below_avg:
+            return "struggles"
+        else:
+            return "struggles"
+
+
+def is_genuine_strength(avg: float, sr: float) -> bool:
+    """
+    Check if performance metrics qualify as a genuine strength by cricket standards.
+    
+    Args:
+        avg: Average (runs per dismissal)
+        sr: Strike rate
+        
+    Returns:
+        True if both metrics meet minimum strength thresholds
+    """
+    # Minimum thresholds for considering something a genuine strength:
+    # Average should be at least 25 (good) AND Strike Rate should be at least 120 (good)
+    return avg >= 25 and sr >= 120
+
+
 def get_top_shots(batter_data: pd.Series, bowling_type: str, top_n: int = 2) -> List[Tuple[str, float]]:
     """
     Get top N shots for a bowling type (pace or spin).
@@ -97,21 +167,30 @@ def generate_length_insight(stats: Dict, first_metric_used: List[bool]) -> str:
     
     parts = []
     
-    # Add strengths
+    # Add strengths (filter out false strengths that don't meet cricket standards)
     if strengths:
-        strength_parts = []
-        for i, (length, avg, sr, z_score) in enumerate(strengths[:2]):  # Max 2 strengths
-            if not first_metric_used[0]:
-                metric_str = format_metric_first_occurrence(avg, sr)
-                first_metric_used[0] = True
-            else:
-                metric_str = format_metric_subsequent(avg, sr)
-            strength_parts.append(f"{length} {metric_str}")
+        # Filter to only include genuine strengths based on absolute performance
+        genuine_strengths = [(length, avg, sr, z) for length, avg, sr, z in strengths 
+                             if is_genuine_strength(avg, sr)]
         
-        if len(strength_parts) == 1:
-            parts.append(f"Strong vs {strength_parts[0]}")
-        else:
-            parts.append(f"Strong vs {' and '.join(strength_parts)}")
+        if genuine_strengths:
+            strength_parts = []
+            for i, (length, avg, sr, z_score) in enumerate(genuine_strengths[:2]):  # Max 2 strengths
+                if not first_metric_used[0]:
+                    metric_str = format_metric_first_occurrence(avg, sr)
+                    first_metric_used[0] = True
+                else:
+                    metric_str = format_metric_subsequent(avg, sr)
+                strength_parts.append(f"{length} {metric_str}")
+            
+            # Evaluate performance to determine appropriate adjective
+            first_strength = genuine_strengths[0]
+            performance_label = evaluate_performance(first_strength[1], first_strength[2], is_strength=True)
+            
+            if len(strength_parts) == 1:
+                parts.append(f"{performance_label.capitalize()} vs {strength_parts[0]}")
+            else:
+                parts.append(f"{performance_label.capitalize()} vs {' and '.join(strength_parts)}")
     
     # Add weaknesses
     if weaknesses:
@@ -124,10 +203,14 @@ def generate_length_insight(stats: Dict, first_metric_used: List[bool]) -> str:
                 metric_str = format_metric_subsequent(avg, sr)
             weakness_parts.append(f"{length} {metric_str}")
         
+        # Evaluate performance to determine appropriate adjective
+        first_weakness = weaknesses[0]
+        performance_label = evaluate_performance(first_weakness[1], first_weakness[2], is_strength=False)
+        
         if len(weakness_parts) == 1:
-            parts.append(f"weak vs {weakness_parts[0]}")
+            parts.append(f"{performance_label} vs {weakness_parts[0]}")
         else:
-            parts.append(f"weak vs {' and '.join(weakness_parts)}")
+            parts.append(f"{performance_label} vs {' and '.join(weakness_parts)}")
     
     # Add bowling advice
     if weaknesses:
@@ -161,21 +244,39 @@ def generate_line_insight(stats: Dict, first_metric_used: List[bool]) -> str:
     
     parts = []
     
-    # Add strengths
+    # Add strengths (filter out false strengths that don't meet cricket standards)
     if strengths:
-        strength_parts = []
-        for i, (line, avg, sr, z_score) in enumerate(strengths[:2]):
-            if not first_metric_used[0]:
-                metric_str = format_metric_first_occurrence(avg, sr)
-                first_metric_used[0] = True
-            else:
-                metric_str = format_metric_subsequent(avg, sr)
-            strength_parts.append(f"{line} {metric_str}")
+        # Filter to only include genuine strengths based on absolute performance
+        genuine_strengths = [(line, avg, sr, z) for line, avg, sr, z in strengths 
+                             if is_genuine_strength(avg, sr)]
         
-        if len(strength_parts) == 1:
-            parts.append(f"Excels {strength_parts[0]}")
-        else:
-            parts.append(f"Excels {' and '.join(strength_parts)}")
+        if genuine_strengths:
+            strength_parts = []
+            for i, (line, avg, sr, z_score) in enumerate(genuine_strengths[:2]):
+                if not first_metric_used[0]:
+                    metric_str = format_metric_first_occurrence(avg, sr)
+                    first_metric_used[0] = True
+                else:
+                    metric_str = format_metric_subsequent(avg, sr)
+                strength_parts.append(f"{line} {metric_str}")
+            
+            # Evaluate performance to determine appropriate verb
+            first_strength = genuine_strengths[0]
+            performance_label = evaluate_performance(first_strength[1], first_strength[2], is_strength=True)
+            
+            # Map adjectives to verbs for line context
+            verb_map = {
+                "strong": "Excels",
+                "solid": "Performs well",
+                "decent": "Does well",
+                "performs": "Performs"
+            }
+            verb = verb_map.get(performance_label, "Excels")
+            
+            if len(strength_parts) == 1:
+                parts.append(f"{verb} {strength_parts[0]}")
+            else:
+                parts.append(f"{verb} {' and '.join(strength_parts)}")
     
     # Add weaknesses
     if weaknesses:
@@ -188,6 +289,7 @@ def generate_line_insight(stats: Dict, first_metric_used: List[bool]) -> str:
                 metric_str = format_metric_subsequent(avg, sr)
             weakness_parts.append(f"{line} {metric_str}")
         
+        # No need to evaluate - use "struggles" as it's already appropriate for weaknesses
         if len(weakness_parts) == 1:
             parts.append(f"struggles {weakness_parts[0]}")
         else:
@@ -238,7 +340,7 @@ def generate_shot_insight(batter_data: pd.Series) -> str:
 
 def generate_boundary_insight(batter_data: pd.Series, batting_hand: str) -> str:
     """
-    Generate Insight 4: Most common boundary-scoring zones.
+    Generate Insight 4: Most common boundary-scoring zones for field placement.
     
     Args:
         batter_data: Series with batter's data
@@ -262,13 +364,13 @@ def generate_boundary_insight(batter_data: pd.Series, batting_hand: str) -> str:
     else:
         advice = f"Protect {top_2_zones[0]}"
     
-    insight = f"Top zones: {zones_text}. {advice}."
+    insight = f"Field Notes - Top boundary zones: {zones_text}. {advice}."
     return f"**Boundaries:** {insight}"
 
 
 def generate_dismissal_insight(batter_data: pd.Series, batting_hand: str) -> str:
     """
-    Generate Insight 5: Most common dismissal zones.
+    Generate Insight 5: Most common dismissal zones for field placement.
     
     Args:
         batter_data: Series with batter's data
@@ -292,7 +394,7 @@ def generate_dismissal_insight(batter_data: pd.Series, batting_hand: str) -> str
     else:
         advice = f"Place catcher at {top_2_zones[0]}"
     
-    insight = f"Catch zones: {zones_text}. {advice}."
+    insight = f"Field Notes - Dismissal zones: {zones_text}. {advice}."
     return f"**Dismissals:** {insight}"
 
 
