@@ -190,11 +190,14 @@ def display_bowler_type_table_html(df: pd.DataFrame):
     ])
     
     # Display the table
+    # Calculate precise height: header (55px) + rows (52px each) + padding (20px)
+    table_height = 55 + (len(display_clean) * 52) + 20
+    
     st.dataframe(
         styled,
         use_container_width=True,
         hide_index=True,
-        height=min(450, (len(display_clean) + 1) * 60 + 10)
+        height=table_height
     )
     
     # Add context info
