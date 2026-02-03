@@ -105,13 +105,26 @@ def display_bowler_type_table_html(df: pd.DataFrame):
     # For Dot Ball % - lower is better
     display_df['Dot_rank'] = display_df['Dot Ball %'].rank(ascending=True, method='min')
     
+    # Store ranks in a dictionary for easy access
+    rank_dict = {}
+    for idx, row in display_df.iterrows():
+        rank_dict[idx] = {
+            'SR_rank': int(row['SR_rank']),
+            'Avg_rank': int(row['Avg_rank']),
+            'Dot_rank': int(row['Dot_rank']),
+            'Boundary_rank': int(row['Boundary_rank'])
+        }
+    
     # Function to apply text color styling to cells
     def apply_text_color_styling(row):
-        # Get colors based on ranks
-        sr_color = get_color_for_rank(int(row['SR_rank']), total_rows, reverse=False)
-        avg_color = get_color_for_rank(int(row['Avg_rank']), total_rows, reverse=False)
-        dot_color = get_color_for_rank(int(row['Dot_rank']), total_rows, reverse=True)
-        boundary_color = get_color_for_rank(int(row['Boundary_rank']), total_rows, reverse=False)
+        # Get the row index
+        idx = row.name
+        
+        # Get colors based on ranks from our dictionary
+        sr_color = get_color_for_rank(rank_dict[idx]['SR_rank'], total_rows, reverse=False)
+        avg_color = get_color_for_rank(rank_dict[idx]['Avg_rank'], total_rows, reverse=False)
+        dot_color = get_color_for_rank(rank_dict[idx]['Dot_rank'], total_rows, reverse=True)
+        boundary_color = get_color_for_rank(rank_dict[idx]['Boundary_rank'], total_rows, reverse=False)
         
         return [
             '',  # Bowler Type - no color
