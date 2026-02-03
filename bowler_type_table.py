@@ -6,51 +6,36 @@ import pandas as pd
 import streamlit as st
 
 
-def get_color_for_metric(value, metric_type, thresholds=None):
+def get_color_for_rank(rank, total_count, reverse=False):
     """
-    Get color based on metric value and type.
+    Get color based on rank position (top 2 = green, middle 2 = yellow, bottom 2 = red).
     
     Args:
-        value: The metric value
-        metric_type: Type of metric ('strike_rate', 'average', 'boundary_pct', 'dot_pct')
-        thresholds: Optional custom thresholds
+        rank: The rank (1 = best)
+        total_count: Total number of items
+        reverse: If True, reverse the logic (for dot ball % where lower is better)
     
     Returns:
         Color code as hex string
     """
-    # Default thresholds based on cricket standards
-    if thresholds is None:
-        thresholds = {
-            'strike_rate': {'good': 140, 'medium': 120},  # Good >= 140, Medium >= 120
-            'average': {'good': 40, 'medium': 25},  # Good >= 40, Medium >= 25
-            'boundary_pct': {'good': 20, 'medium': 15},  # Good >= 20%, Medium >= 15%
-            'dot_pct': {'good': 30, 'medium': 40}  # Good <= 30%, Medium <= 40% (reversed)
-        }
-    
     # Colors
-    GREEN = '#22c55e'  # Good
-    YELLOW = '#facc15'  # Medium
-    RED = '#ef4444'  # Bad
+    GREEN = '#10b981'  # Emerald green
+    YELLOW = '#f59e0b'  # Amber
+    RED = '#ef4444'  # Red
     
-    if pd.isna(value) or value == 0:
-        return '#6b7280'  # Gray for NA/0
+    if reverse:
+        # For dot ball %, lower values are better, so reverse the ranking
+        rank = total_count - rank + 1
     
-    # For dot_pct, lower is better (reverse logic)
-    if metric_type == 'dot_pct':
-        if value <= thresholds[metric_type]['good']:
-            return GREEN
-        elif value <= thresholds[metric_type]['medium']:
-            return YELLOW
-        else:
-            return RED
+    # Top 2 ranks get green
+    if rank <= 2:
+        return GREEN
+    # Bottom 2 ranks get red
+    elif rank > total_count - 2:
+        return RED
+    # Middle ranks get yellow
     else:
-        # For other metrics, higher is better
-        if value >= thresholds[metric_type]['good']:
-            return GREEN
-        elif value >= thresholds[metric_type]['medium']:
-            return YELLOW
-        else:
-            return RED
+        return YELLOW
 
 
 def generate_bowler_type_table(bowler_data_df: pd.DataFrame, batter_name: str) -> pd.DataFrame:
@@ -73,10 +58,9 @@ def generate_bowler_type_table(bowler_data_df: pd.DataFrame, batter_name: str) -
     # Calculate strike rate
     batter_df['strike_rate'] = (batter_df['runs_vs_type'] / batter_df['balls_faced'] * 100).round(1)
     
-    # Select and rename columns for display
+    # Select and rename columns for display (excluding balls_faced)
     display_df = batter_df[[
         'bowler.type',
-        'balls_faced',
         'strike_rate',
         'batting_avg',
         'dot_pct',
@@ -84,10 +68,10 @@ def generate_bowler_type_table(bowler_data_df: pd.DataFrame, batter_name: str) -
     ]].copy()
     
     # Rename columns
-    display_df.columns = ['Bowler Type', 'Balls Faced', 'Strike Rate', 'Average', 'Dot Ball %', 'Boundary %']
+    display_df.columns = ['Bowler Type', 'Strike Rate', 'Average', 'Dot Ball %', 'Boundary %']
     
-    # Sort by balls faced (descending) to show most relevant bowler types first
-    display_df = display_df.sort_values('Balls Faced', ascending=False)
+    # Sort by strike rate (descending) to show best performing types first
+    display_df = display_df.sort_values('Strike Rate', ascending=False)
     
     # Reset index
     display_df = display_df.reset_index(drop=True)
@@ -97,7 +81,7 @@ def generate_bowler_type_table(bowler_data_df: pd.DataFrame, batter_name: str) -
 
 def display_bowler_type_table_html(df: pd.DataFrame):
     """
-    Display the bowler type table with color coding using Streamlit's dataframe styling.
+    Display the bowler type table with rank-based color coding.
     
     Args:
         df: DataFrame with performance metrics
@@ -111,42 +95,100 @@ def display_bowler_type_table_html(df: pd.DataFrame):
     
     # Create a copy for styling
     display_df = df.copy()
+    total_rows = len(display_df)
     
-    # Function to apply background color to cells
-    def apply_color_gradient(row):
-        # Get colors for each metric
-        sr_color = get_color_for_metric(row['Strike Rate'], 'strike_rate')
-        avg_color = get_color_for_metric(row['Average'], 'average')
-        dot_color = get_color_for_metric(row['Dot Ball %'], 'dot_pct')
-        boundary_color = get_color_for_metric(row['Boundary %'], 'boundary_pct')
+    # Calculate ranks for each column (1 = best, higher is worse)
+    # For Strike Rate, Average, Boundary % - higher is better
+    display_df['SR_rank'] = display_df['Strike Rate'].rank(ascending=False, method='min')
+    display_df['Avg_rank'] = display_df['Average'].rank(ascending=False, method='min')
+    display_df['Boundary_rank'] = display_df['Boundary %'].rank(ascending=False, method='min')
+    # For Dot Ball % - lower is better
+    display_df['Dot_rank'] = display_df['Dot Ball %'].rank(ascending=True, method='min')
+    
+    # Function to apply text color styling to cells
+    def apply_text_color_styling(row):
+        # Get colors based on ranks
+        sr_color = get_color_for_rank(int(row['SR_rank']), total_rows, reverse=False)
+        avg_color = get_color_for_rank(int(row['Avg_rank']), total_rows, reverse=False)
+        dot_color = get_color_for_rank(int(row['Dot_rank']), total_rows, reverse=True)
+        boundary_color = get_color_for_rank(int(row['Boundary_rank']), total_rows, reverse=False)
         
         return [
-            '',  # Bowler Type
-            '',  # Balls Faced
-            f'background-color: {sr_color}; color: #1a2332; font-weight: bold',  # Strike Rate
-            f'background-color: {avg_color}; color: #1a2332; font-weight: bold',  # Average
-            f'background-color: {dot_color}; color: #1a2332; font-weight: bold',  # Dot Ball %
-            f'background-color: {boundary_color}; color: #1a2332; font-weight: bold'  # Boundary %
+            '',  # Bowler Type - no color
+            f'color: {sr_color}; font-weight: 600',  # Strike Rate
+            f'color: {avg_color}; font-weight: 600',  # Average
+            f'color: {dot_color}; font-weight: 600',  # Dot Ball %
+            f'color: {boundary_color}; font-weight: 600'  # Boundary %
         ]
     
+    # Create display dataframe without rank columns
+    display_clean = display_df[['Bowler Type', 'Strike Rate', 'Average', 'Dot Ball %', 'Boundary %']].copy()
+    
     # Apply the styling
-    styled = display_df.style.apply(apply_color_gradient, axis=1)
+    styled = display_clean.style.apply(apply_text_color_styling, axis=1)
     
     # Format numeric columns
     styled = styled.format({
-        'Balls Faced': '{:.0f}',
         'Strike Rate': lambda x: f'{x:.1f}' if pd.notna(x) else '-',
         'Average': lambda x: f'{x:.1f}' if pd.notna(x) else '-',
         'Dot Ball %': lambda x: f'{x:.1f}%' if pd.notna(x) else '-',
         'Boundary %': lambda x: f'{x:.1f}%' if pd.notna(x) else '-'
     })
     
+    # Set table styles for better appearance
+    styled = styled.set_table_styles([
+        {'selector': 'thead th', 'props': [
+            ('background', 'linear-gradient(135deg, #334155 0%, #1e293b 100%)'),
+            ('color', '#94a3b8'),
+            ('padding', '18px 20px'),
+            ('text-align', 'left'),
+            ('font-weight', '600'),
+            ('font-size', '13px'),
+            ('letter-spacing', '0.5px'),
+            ('text-transform', 'uppercase'),
+            ('border-bottom', '2px solid #00d9c0')
+        ]},
+        {'selector': 'tbody tr', 'props': [
+            ('background', '#1e293b'),
+            ('border-bottom', '1px solid rgba(71, 85, 105, 0.3)')
+        ]},
+        {'selector': 'tbody tr:hover', 'props': [
+            ('background', 'rgba(51, 65, 85, 0.4)')
+        ]},
+        {'selector': 'tbody td', 'props': [
+            ('padding', '16px 20px'),
+            ('color', '#e2e8f0'),
+            ('font-size', '15px')
+        ]},
+        {'selector': 'tbody td:first-child', 'props': [
+            ('font-weight', '500'),
+            ('color', '#f1f5f9')
+        ]},
+        {'selector': 'table', 'props': [
+            ('width', '100%'),
+            ('border-collapse', 'separate'),
+            ('border-spacing', '0'),
+            ('margin', '1.5rem 0'),
+            ('background', 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'),
+            ('border-radius', '12px'),
+            ('overflow', 'hidden'),
+            ('box-shadow', '0 10px 30px rgba(0, 0, 0, 0.3)')
+        ]}
+    ])
+    
     # Display the table
     st.dataframe(
         styled,
         use_container_width=True,
         hide_index=True,
-        height=min(400, (len(df) + 1) * 35 + 10)
+        height=min(450, (len(display_clean) + 1) * 60 + 10)
+    )
+    
+    # Add context info
+    st.markdown(
+        '<p style="color: #64748b; font-size: 13px; margin-top: 0.5rem; font-style: italic;">'
+        'Performance statistics against different bowling types</p>',
+        unsafe_allow_html=True
     )
 
 
