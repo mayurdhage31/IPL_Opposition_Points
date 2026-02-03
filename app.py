@@ -8,6 +8,7 @@ import pandas as pd
 from typing import List
 import data_loader
 import writeup_generator
+import bowler_type_table
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -281,6 +282,22 @@ st.markdown("""
         height: 18px;
         cursor: pointer;
     }
+    
+    /* Toggle button styling */
+    .element-container:has(button[kind="secondary"]) button {
+        background-color: #2a3444 !important;
+        border: 1px solid #3a4556 !important;
+        color: #00d9c0 !important;
+        font-size: 0.85rem !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .element-container:has(button[kind="secondary"]) button:hover {
+        background-color: #3a4556 !important;
+        border-color: #00d9c0 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -292,7 +309,14 @@ def load_data():
         'Batting_data_IPL__2123.csv',
         'IPL_top7_run_scorers_by_team_2021_2023.csv'
     )
-    return batting_df, merged_df, teams
+    
+    # Load bowler type data
+    bowler_type_df = pd.read_csv('Batters_StrikeRateVSBowlerTypeNew.csv')
+    
+    # Load zone data
+    zone_df = pd.read_csv('batter_fours_sixes_by_zone_wide_2021_2023.csv')
+    
+    return batting_df, merged_df, teams, bowler_type_df, zone_df
 
 
 def generate_pdf(batting_df: pd.DataFrame, selected_df: pd.DataFrame, team_name: str) -> BytesIO:
@@ -482,10 +506,10 @@ def display_writeup(writeup_dict: dict, player_name: str):
 def main():
     # Load data first
     try:
-        batting_df, merged_df, teams = load_data()
+        batting_df, merged_df, teams, bowler_type_df, zone_df = load_data()
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
-        st.info("Please ensure both CSV files are in the same directory as the app.")
+        st.info("Please ensure all CSV files are in the same directory as the app.")
         return
     
     # Sidebar for team and player selection
@@ -572,20 +596,57 @@ def main():
     for tab_idx, (tab, player_row) in enumerate(zip(tabs, selected_df.iterrows())):
         with tab:
             batter_data = player_row[1]
+            batter_name = batter_data['bat']
             
-            # Generate write-up
-            with st.spinner(f"Generating analysis for {batter_data['bat']}..."):
+            # Add toggle button in the top right corner
+            col1, col2 = st.columns([6, 1])
+            with col2:
+                # Initialize toggle state for this player if not exists
+                toggle_key = f"show_viz_{batter_name}"
+                if toggle_key not in st.session_state:
+                    st.session_state[toggle_key] = False
+                
+                # Create toggle button
+                button_label = "📊 Show Visualizations" if not st.session_state[toggle_key] else "📝 Show Text"
+                if st.button(button_label, key=f"toggle_{batter_name}", use_container_width=True, type="secondary"):
+                    st.session_state[toggle_key] = not st.session_state[toggle_key]
+                    st.rerun()
+            
+            # Display content based on toggle state
+            if st.session_state[toggle_key]:
+                # Show visualizations
+                st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
+                
+                # Display bowler type table
                 try:
-                    writeup = writeup_generator.generate_writeup(batting_df, batter_data)
-                    
-                    # Check if we have sufficient insights
-                    if writeup['num_insights'] < 3:
-                        st.warning(f"⚠️ Limited data available for {batter_data['bat']}. Only {writeup['num_insights']} insight(s) generated.")
-                    
-                    display_writeup(writeup, batter_data['bat'])
-                    
+                    table_df = bowler_type_table.generate_bowler_type_table(bowler_type_df, batter_name)
+                    if not table_df.empty:
+                        bowler_type_table.display_bowler_type_table_html(table_df)
+                    else:
+                        st.warning(f"⚠️ No bowling type data available for {batter_name}")
                 except Exception as e:
-                    st.error(f"Error generating write-up for {batter_data['bat']}: {str(e)}")
+                    st.error(f"Error generating table for {batter_name}: {str(e)}")
+                
+                # Display zone analysis (placeholder for future implementation)
+                st.markdown('<div style="margin-top: 3rem;"></div>', unsafe_allow_html=True)
+                try:
+                    bowler_type_table.display_zone_analysis(zone_df, batter_name)
+                except Exception as e:
+                    st.error(f"Error generating zone analysis for {batter_name}: {str(e)}")
+            else:
+                # Show text write-up
+                with st.spinner(f"Generating analysis for {batter_name}..."):
+                    try:
+                        writeup = writeup_generator.generate_writeup(batting_df, batter_data)
+                        
+                        # Check if we have sufficient insights
+                        if writeup['num_insights'] < 3:
+                            st.warning(f"⚠️ Limited data available for {batter_name}. Only {writeup['num_insights']} insight(s) generated.")
+                        
+                        display_writeup(writeup, batter_name)
+                        
+                    except Exception as e:
+                        st.error(f"Error generating write-up for {batter_name}: {str(e)}")
     
     # Handle PDF download in sidebar
     with st.sidebar:
