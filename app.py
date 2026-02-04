@@ -292,6 +292,9 @@ st.markdown("""
         padding: 0.5rem 1rem !important;
         border-radius: 8px !important;
         transition: all 0.3s ease !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
     
     .element-container:has(button[kind="secondary"]) button:hover {
@@ -599,14 +602,14 @@ def main():
             batter_name = batter_data['bat']
             
             # Add toggle button in the top right corner
-            col1, col2 = st.columns([6, 1])
+            col1, col2 = st.columns([3, 1])
             with col2:
                 # Initialize toggle state for this player if not exists
                 toggle_key = f"show_viz_{batter_name}"
                 if toggle_key not in st.session_state:
                     st.session_state[toggle_key] = False
                 
-                # Create toggle button
+                # Create toggle button with shorter label to prevent text wrapping
                 button_label = "📊 Show Visualizations" if not st.session_state[toggle_key] else "📝 Show Text"
                 if st.button(button_label, key=f"toggle_{batter_name}", use_container_width=True, type="secondary"):
                     st.session_state[toggle_key] = not st.session_state[toggle_key]

@@ -4,6 +4,7 @@ Module to generate color-coded performance vs bowling types table
 
 import pandas as pd
 import streamlit as st
+import wagon_wheel
 
 
 def get_color_for_rank(rank, total_count, reverse=False):
@@ -69,6 +70,14 @@ def generate_bowler_type_table(bowler_data_df: pd.DataFrame, batter_name: str) -
     
     # Rename columns
     display_df.columns = ['Bowler Type', 'Strike Rate', 'Average', 'Dot Ball %', 'Boundary %']
+    
+    # CRITICAL FIX: Remove any rows where all numeric values are NaN or 0
+    # This prevents blank rows from appearing in the table
+    numeric_cols = ['Strike Rate', 'Average', 'Dot Ball %', 'Boundary %']
+    display_df = display_df.dropna(subset=numeric_cols, how='all')
+    
+    # Also remove rows where strike rate is 0 or NaN (no meaningful data)
+    display_df = display_df[display_df['Strike Rate'].notna() & (display_df['Strike Rate'] > 0)]
     
     # Sort by strike rate (descending) to show best performing types first
     display_df = display_df.sort_values('Strike Rate', ascending=False)
@@ -210,7 +219,7 @@ def display_bowler_type_table_html(df: pd.DataFrame):
 
 def display_zone_analysis(zone_df: pd.DataFrame, batter_name: str):
     """
-    Display zone-based boundary analysis.
+    Display zone-based boundary analysis with wagon wheel visualization.
     
     Args:
         zone_df: DataFrame with zone data
@@ -223,5 +232,16 @@ def display_zone_analysis(zone_df: pd.DataFrame, batter_name: str):
         st.info("📊 No zone analysis data available for this player.")
         return
     
-    st.markdown('<div class="table-title">Boundary Distribution by Zone</div>', unsafe_allow_html=True)
-    st.info("🚧 Zone visualization coming soon...")
+    # Display title
+    st.markdown('<h2 style="color: #00d9c0; margin-top: 2rem;">Boundary Distribution by Zone</h2>', unsafe_allow_html=True)
+    
+    # Create and display wagon wheel
+    fig = wagon_wheel.create_wagon_wheel(zone_df, batter_name)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Add context info
+    st.markdown(
+        '<p style="color: #64748b; font-size: 13px; margin-top: 0.5rem; font-style: italic;">'
+        'Wagon wheel showing distribution of fours (blue) and sixes (red) across different zones</p>',
+        unsafe_allow_html=True
+    )
