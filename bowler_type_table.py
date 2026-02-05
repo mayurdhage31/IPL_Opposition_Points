@@ -108,20 +108,22 @@ def display_bowler_type_table_html(df: pd.DataFrame):
     
     # Calculate ranks for each column (1 = best, higher is worse)
     # For Strike Rate, Average, Boundary % - higher is better
-    display_df['SR_rank'] = display_df['Strike Rate'].rank(ascending=False, method='min')
-    display_df['Avg_rank'] = display_df['Average'].rank(ascending=False, method='min')
-    display_df['Boundary_rank'] = display_df['Boundary %'].rank(ascending=False, method='min')
+    # Use na_option='keep' to preserve NaN values instead of ranking them
+    display_df['SR_rank'] = display_df['Strike Rate'].rank(ascending=False, method='min', na_option='keep')
+    display_df['Avg_rank'] = display_df['Average'].rank(ascending=False, method='min', na_option='keep')
+    display_df['Boundary_rank'] = display_df['Boundary %'].rank(ascending=False, method='min', na_option='keep')
     # For Dot Ball % - lower is better
-    display_df['Dot_rank'] = display_df['Dot Ball %'].rank(ascending=True, method='min')
+    display_df['Dot_rank'] = display_df['Dot Ball %'].rank(ascending=True, method='min', na_option='keep')
     
     # Store ranks in a dictionary for easy access
+    # Use NaN-safe conversion: only convert to int if value is not NaN
     rank_dict = {}
     for idx, row in display_df.iterrows():
         rank_dict[idx] = {
-            'SR_rank': int(row['SR_rank']),
-            'Avg_rank': int(row['Avg_rank']),
-            'Dot_rank': int(row['Dot_rank']),
-            'Boundary_rank': int(row['Boundary_rank'])
+            'SR_rank': int(row['SR_rank']) if pd.notna(row['SR_rank']) else None,
+            'Avg_rank': int(row['Avg_rank']) if pd.notna(row['Avg_rank']) else None,
+            'Dot_rank': int(row['Dot_rank']) if pd.notna(row['Dot_rank']) else None,
+            'Boundary_rank': int(row['Boundary_rank']) if pd.notna(row['Boundary_rank']) else None
         }
     
     # Function to apply text color styling to cells
@@ -130,17 +132,18 @@ def display_bowler_type_table_html(df: pd.DataFrame):
         idx = row.name
         
         # Get colors based on ranks from our dictionary
-        sr_color = get_color_for_rank(rank_dict[idx]['SR_rank'], total_rows, reverse=False)
-        avg_color = get_color_for_rank(rank_dict[idx]['Avg_rank'], total_rows, reverse=False)
-        dot_color = get_color_for_rank(rank_dict[idx]['Dot_rank'], total_rows, reverse=True)
-        boundary_color = get_color_for_rank(rank_dict[idx]['Boundary_rank'], total_rows, reverse=False)
+        # Only apply color if rank is not None (i.e., value is not NaN)
+        sr_color = get_color_for_rank(rank_dict[idx]['SR_rank'], total_rows, reverse=False) if rank_dict[idx]['SR_rank'] is not None else None
+        avg_color = get_color_for_rank(rank_dict[idx]['Avg_rank'], total_rows, reverse=False) if rank_dict[idx]['Avg_rank'] is not None else None
+        dot_color = get_color_for_rank(rank_dict[idx]['Dot_rank'], total_rows, reverse=True) if rank_dict[idx]['Dot_rank'] is not None else None
+        boundary_color = get_color_for_rank(rank_dict[idx]['Boundary_rank'], total_rows, reverse=False) if rank_dict[idx]['Boundary_rank'] is not None else None
         
         return [
             '',  # Bowler Type - no color
-            f'color: {sr_color}; font-weight: 600',  # Strike Rate
-            f'color: {avg_color}; font-weight: 600',  # Average
-            f'color: {dot_color}; font-weight: 600',  # Dot Ball %
-            f'color: {boundary_color}; font-weight: 600'  # Boundary %
+            f'color: {sr_color}; font-weight: 600' if sr_color else '',  # Strike Rate
+            f'color: {avg_color}; font-weight: 600' if avg_color else '',  # Average
+            f'color: {dot_color}; font-weight: 600' if dot_color else '',  # Dot Ball %
+            f'color: {boundary_color}; font-weight: 600' if boundary_color else ''  # Boundary %
         ]
     
     # Create display dataframe without rank columns
